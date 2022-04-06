@@ -1,0 +1,9 @@
+Galvo: True
+ScanLaser/ao1:True:/ScanLaser/PFI9:-3.0:3.0:-0.065:0.0165
+Laser: True
+0:488 Laser:ScanLaser/ao0:2.3:488 Filter:1
+1:561 Laser:ScanLaser/port1/line0:0.0:561 Filter:3
+0:647 Laser:RedLaser/ao0:2.3:647 Filter:2
+end
+Camera: False
+OptoSplit: False
