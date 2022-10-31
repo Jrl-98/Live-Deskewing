@@ -24,11 +24,11 @@ This is a software package to display deskewed images in real time for lightshee
 
 ## Examples
 
-### Widefield Mode
+### Global Update Mode - Supplementary Video 1
 
 https://user-images.githubusercontent.com/56591782/162004554-b2fb6de8-8a08-4195-827c-5b5663868235.mov
 
-### Confocal Mode
+### Rolling Update Mode - Supplementary Video 2
 
 https://user-images.githubusercontent.com/56591782/162005417-42f945a7-e537-43a8-a2b5-10235bc5df28.mov
 
