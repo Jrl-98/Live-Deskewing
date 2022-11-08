@@ -8,6 +8,8 @@ This is a software package to display deskewed images in real time for lightshee
 Please see the software user manual to help with getting started with the software. However, if you have an issues using the code that has not been addressed please feel free to email me at jrl70@cam.ac.uk. 
 
 ## Using Live Deskewing GUI
+Before running the code for the first time the file path for the images on lines 285-291 will need to be update to where you have them saved on your PC. All the required images can be found in the GUI_Images folder.
+
 1) Open the camera in micromanager and select the ROI where the sheet is formed. NB: Smaller ROIs will have a higher final framerate
 2) Run the script *Live_Deskew_GUI.py*
 3) Press the *Start* button to begin displaying a live deskewed output.
