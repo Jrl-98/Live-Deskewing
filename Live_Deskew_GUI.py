@@ -258,9 +258,9 @@ class deskewApp:
         self.daqdilines_clicked = tk.StringVar()
         self.daqdilines_clicked.set(self.daqdilines[0]) 
 
-        self.Comp_options = ["Widefield Mode","Confocal Mode"]
+        self.Comp_options = ["Global Update Mode","Rolling Update Mode"]
         self.Comp_clicked = tk.StringVar()
-        self.Comp_clicked.set( "Widefield Mode" ) 
+        self.Comp_clicked.set( "Global Update Mode" ) 
 
         self.scn_range = tk.IntVar()  
         self.nostep = tk.IntVar() 
@@ -282,13 +282,13 @@ class deskewApp:
         
 
         #Install the relavent images
-        self.Titleimg = ImageTk.PhotoImage(file=r"C:\Users\OPM_Admin\Documents\Python Scripts\WorkInProgress\GUI_for_FOM\GUI_Images\LiveDeskewLogo.jpg")
-        self.Liveimg = ImageTk.PhotoImage(file=r"C:\Users\OPM_Admin\Documents\Python Scripts\WorkInProgress\GUI_for_FOM\GUI_Images\LiveButtonLogo.jpg")
-        self.StopLiveimg = ImageTk.PhotoImage(file=r"C:\Users\OPM_Admin\Documents\Python Scripts\WorkInProgress\GUI_for_FOM\GUI_Images\StopLiveButtonLogo.jpg")
-        self.OnSwitch = ImageTk.PhotoImage(file=r"C:\Users\OPM_Admin\Documents\Python Scripts\WorkInProgress\GUI_for_FOM\GUI_Images\onswitch.jpg")
-        self.OffSwitch = ImageTk.PhotoImage(file=r"C:\Users\OPM_Admin\Documents\Python Scripts\WorkInProgress\GUI_for_FOM\GUI_Images\offswitch.jpg")
+        self.Titleimg = ImageTk.PhotoImage(file=r"C:\Users\OPM_Admin\Documents\Python Scripts\Live-Deskewing-main\GUI_Images\LiveDeskewLogo.jpg")
+        self.Liveimg = ImageTk.PhotoImage(file=r"C:\Users\OPM_Admin\Documents\Python Scripts\Live-Deskewing-main\GUI_Images\LiveButtonLogo.jpg")
+        self.StopLiveimg = ImageTk.PhotoImage(file=r"C:\Users\OPM_Admin\Documents\Python Scripts\Live-Deskewing-main\GUI_Images\StopLiveButtonLogo.jpg")
+        self.OnSwitch = ImageTk.PhotoImage(file=r"C:\Users\OPM_Admin\Documents\Python Scripts\Live-Deskewing-main\GUI_Images\onswitch.jpg")
+        self.OffSwitch = ImageTk.PhotoImage(file=r"C:\Users\OPM_Admin\Documents\Python Scripts\Live-Deskewing-main\GUI_Images\offswitch.jpg")
         self.Deskewedimg =  ImageTk.PhotoImage(image=Image.fromarray(np.zeros((self.DSKW.new_height,self.DSKW.width))))
-        self.LAGLogo = ImageTk.PhotoImage(file=r"C:\Users\OPM_Admin\Documents\Python Scripts\WorkInProgress\GUI_for_FOM\GUI_Images\LAG_logo.png")
+        self.LAGLogo = ImageTk.PhotoImage(file=r"C:\Users\OPM_Admin\Documents\Python Scripts\Live-Deskewing-main\GUI_Images\LAG_logo.png")
 
         #Define the GUI objects
         self.tabControl = ttk.Notebook(self.master)
@@ -615,7 +615,7 @@ class deskewApp:
                 self.daqdilines.append(line)
 
     def compModeSelect(self,value):
-        if value ==  "Widefield Mode":
+        if value ==  "Global Update Mode":
             self.DSKW.setDisplayMode(True)
         else:
             self.DSKW.setDisplayMode(False)
