@@ -1,8 +1,8 @@
-from pycromanager import Bridge
+#from xml.etree.ElementInclude import LimitedRecursiveIncludeError
 from ctypes.wintypes import RGB
 from tkinter.constants import DISABLED, HORIZONTAL, NORMAL, VERTICAL
 from PIL import Image, ImageTk
-from utils.OptoSpin import CairnOptoSpin
+from utils.MotrisedFilterWheel import MotrisedFilterWheel
 from utils.NIDAQlasers import Lasers
 from utils.OPMLiveDeskewing import livedeskew
 import tkinter as tk
@@ -13,60 +13,6 @@ import numpy as np
 import time
 import os
 import nidaqmx
-
-class Lasers:
-    def __init__(self,type):
-        self.port = nidaqmx.Task()
-        self.type = type
-        self.connected = 0 
-        self.power = 0 #Percentage power
-        self.max_voltage = 0
-        self.on = False
-        self.filterPos = 0
-
-    def set_power(self,pwr):
-        self.power = pwr
-
-    def set_maxVoltage(self,volts):
-        self.max_voltage = volts
-
-    def set_filterPos(self,Pos):
-        self.filterPos = Pos
-
-    def get_filterPos(self):
-        return self.filterPos
-
-    def connect(self,portName):
-        if self.type == 'TTL':
-            self.port.do_channels.add_do_chan(portName)
-            self.connected = 1 
-        elif self.type == 'Voltage':
-            self.port.ao_channels.add_ao_voltage_chan(portName,'mychannel',0,5)
-            self.connected = 1 
-
-    def change_state(self, state):
-        if state:
-            self.on = True
-            if self.type == 'TTL':
-                self.port.write(True)
-            elif self.type == 'Voltage':
-                volts = self.max_voltage * (self.power/100)
-                self.port.write(volts)
-        else:
-            self.on = False
-            if self.type == 'TTL':
-                self.port.write(False)
-            elif self.type == 'Voltage':
-                self.port.write(0)
-
-    def update(self):
-        if self.on:
-            if self.type == 'Voltage':
-                volts = self.max_voltage * (self.power/100)
-                self.port.write(volts)
-            
-    def exit(self):
-        self.port.close()
 
 class LaserFilterWindow(tk.Toplevel):
     def __init__(self, parent):
@@ -203,7 +149,6 @@ class deskewApp:
         self.rotateq = multiprocessing.Value('d', 0)
 
         self.DSKW = livedeskew(self.stopq,self.rotateq,self.dskwImgq,self.dskwImgq2,self.dskwImgq3)
-        self.FilterWheel = CairnOptoSpin()
 
         if (self.DSKW.new_height+40) > 760:
             self.master.geometry(str(self.DSKW.width+475+20) + "x" + str(self.DSKW.new_height+40))
@@ -262,6 +207,10 @@ class deskewApp:
         self.Comp_clicked = tk.StringVar()
         self.Comp_clicked.set( "Global Update Mode" ) 
 
+        self.Proj_options = ["MIP","Single Slice"]
+        self.Proj_clicked = tk.StringVar()
+        self.Proj_clicked.set("MIP") 
+
         self.scn_range = tk.IntVar()  
         self.nostep = tk.IntVar() 
         self.exposure = tk.DoubleVar() 
@@ -274,26 +223,26 @@ class deskewApp:
         self.galvooffV = tk.DoubleVar() 
         self.galvov2um = tk.DoubleVar() 
         self.LaserFilter = tk.IntVar() 
+        self.FilterWheelConnected = False
+        self.FilterWheelenabled = tk.IntVar()
         self.CameraTrigger = tk.IntVar()
         self.CameraTrigger_clicked = tk.StringVar()
         self.CameraTrigger_clicked.set(self.DSKW.Trigger_Options[0]) 
         self.OptoSplit = tk.IntVar()
         self.openFilterPos = tk.IntVar()
         
-
-        #Install the relavent images
-        self.Titleimg = ImageTk.PhotoImage(file=r"C:\Users\OPM_Admin\Documents\Python Scripts\Live-Deskewing-main\GUI_Images\LiveDeskewLogo.jpg")
-        self.Liveimg = ImageTk.PhotoImage(file=r"C:\Users\OPM_Admin\Documents\Python Scripts\Live-Deskewing-main\GUI_Images\LiveButtonLogo.jpg")
-        self.StopLiveimg = ImageTk.PhotoImage(file=r"C:\Users\OPM_Admin\Documents\Python Scripts\Live-Deskewing-main\GUI_Images\StopLiveButtonLogo.jpg")
-        self.OnSwitch = ImageTk.PhotoImage(file=r"C:\Users\OPM_Admin\Documents\Python Scripts\Live-Deskewing-main\GUI_Images\onswitch.jpg")
-        self.OffSwitch = ImageTk.PhotoImage(file=r"C:\Users\OPM_Admin\Documents\Python Scripts\Live-Deskewing-main\GUI_Images\offswitch.jpg")
+        self.Titleimg = ImageTk.PhotoImage(file=r"C:\Users\OPM_Admin\Documents\Python Scripts\WorkInProgress\GUI_for_FOM\GUI_Images\LiveDeskewLogo.jpg")
+        self.Liveimg = ImageTk.PhotoImage(file=r"C:\Users\OPM_Admin\Documents\Python Scripts\WorkInProgress\GUI_for_FOM\GUI_Images\LiveButtonLogo.jpg")
+        self.StopLiveimg = ImageTk.PhotoImage(file=r"C:\Users\OPM_Admin\Documents\Python Scripts\WorkInProgress\GUI_for_FOM\GUI_Images\StopLiveButtonLogo.jpg")
+        self.OnSwitch = ImageTk.PhotoImage(file=r"C:\Users\OPM_Admin\Documents\Python Scripts\WorkInProgress\GUI_for_FOM\GUI_Images\onswitch.jpg")
+        self.OffSwitch = ImageTk.PhotoImage(file=r"C:\Users\OPM_Admin\Documents\Python Scripts\WorkInProgress\GUI_for_FOM\GUI_Images\offswitch.jpg")
         self.Deskewedimg =  ImageTk.PhotoImage(image=Image.fromarray(np.zeros((self.DSKW.new_height,self.DSKW.width))))
-        self.LAGLogo = ImageTk.PhotoImage(file=r"C:\Users\OPM_Admin\Documents\Python Scripts\Live-Deskewing-main\GUI_Images\LAG_logo.png")
+        self.LAGLogo = ImageTk.PhotoImage(file=r"C:\Users\OPM_Admin\Documents\Python Scripts\WorkInProgress\GUI_for_FOM\GUI_Images\LAG_logo.png")
 
         #Define the GUI objects
         self.tabControl = ttk.Notebook(self.master)
-        self.Livetab = ttk.Frame(self.tabControl, width=450, height=430)
-        self.Controltab = ttk.Frame(self.tabControl, width=450, height=430)
+        self.Livetab = ttk.Frame(self.tabControl, width=450, height=460)
+        self.Controltab = ttk.Frame(self.tabControl, width=450, height=460)
        
         self.tabControl.add(self.Livetab, text ='Live Settings')
         self.tabControl.add(self.Controltab, text ='Control Settings')
@@ -310,7 +259,7 @@ class deskewApp:
         #Live Tab Objects
         self.maxslider = tk.Scale(self.Livetab, from_=10, to=8000, length = 200, label = 'Max Intensity', orient=VERTICAL,bd = 0,command=self.max_scale)
         self.minslider = tk.Scale(self.Livetab, from_=0, to=200, length = 200, label = 'Min Intensity', orient=VERTICAL,bd = 0,command=self.min_scale)
-        self.Rotateslider = tk.Scale(self.Livetab, from_=0, to=90, length = 200, label = 'Rotate', orient=VERTICAL,bd = 0, command = self.rotate_scale)
+        self.Rotateslider = tk.Scale(self.Livetab, from_=0, to=90, length = 200, label = 'Rotate', state = DISABLED, orient=VERTICAL,bd = 0, command = self.rotate_scale)
         self.scan_range_label = tk.Label(self.Livetab, text = "Scan Range (um):",bd = 0)
         self.scan_entry = tk.Entry(self.Livetab, textvariable=self.scn_range, width=4)
         self.no_steps_label = tk.Label(self.Livetab, text = "No. Steps:",bd = 0)
@@ -398,6 +347,7 @@ class deskewApp:
         self.LaserFilter_LB = tk.Listbox(self.Controltab, height = 4, width = 60, selectmode = SINGLE)
         self.LaserFilter_add = tk.Button(self.Controltab, text = "Add", state = NORMAL, bd = 1, command = self.addLaser_Filter)
         self.LaserFilter_remove = tk.Button(self.Controltab, text = "Remove", state = NORMAL, bd = 1, command = self.removeLaser_Filter)
+        self.FilterWheel_check = tk.Checkbutton(self.Controltab, text = "Connect to Filterwheel" , variable=self.FilterWheelenabled, onvalue=1, offvalue=0)
         self.CameraTrigger_label = tk.Label(self.Controltab, text = "Camera Triggering:", bd = 0)
         self.CameraTrigger_check = tk.Checkbutton(self.Controltab, text = "Enable" , variable=self.CameraTrigger, onvalue=1, offvalue=0, command = self.enableCamera)
         self.CameraTrigger_Apply = tk.Button(self.Controltab, text = "Apply", state = DISABLED, bd = 1)
@@ -416,6 +366,9 @@ class deskewApp:
         self.OptoSplitCanvas.itemconfig(self.OptoSplitLED, fill="red")
         self.OptosplitFilter_label = tk.Label(self.Controltab, text = "Open Filter Position:", bd = 0)
         self.OptosplitFilter_entry = tk.Entry(self.Controltab, textvariable=self.openFilterPos, width=6)
+        self.Proj_label = tk.Label(self.Controltab, text = "Reconstruction mode:", bd = 0)
+        self.Proj_drop = tk.OptionMenu(self.Controltab ,self.Proj_clicked , *self.Proj_options, command = self.projModeSelect)
+
         self.SaveConfig = tk.Button(self.Controltab, text = "Save Config File", bd = 1, command = self.saveConfigFile)
 
         #Set Normal/Disable States
@@ -453,7 +406,7 @@ class deskewApp:
         self.fps_label.place(x = 190, y = 200)
         self.Comp_drop.place(x = 160, y = 165)
         self.videofeed.place(x = 475, y = 20)
-        self.LogoGraphic.place(x = 5, y = 700)
+        self.LogoGraphic.place(x = 5, y = 730)
         #Live Tab
         self.tabControl.place(x= 5, y= 230)
 
@@ -537,23 +490,27 @@ class deskewApp:
 
         self.LaserFilter_remove.place(x = 375, y= 210)
 
-        self.CameraTrigger_label.place(x = 10, y= 260)
-        self.CameraTrigger_check.place(x = 150, y= 260)
-        self.CameraTrigger_Apply.place(x = 300, y= 260 )
-        self.CameraTriggerCanvas.place(x = 350, y= 260 )
+        self.FilterWheel_check.place(x = 10, y = 260)
 
-        self.CameraTrigger_selection_label.place(x = 10, y= 300)
-        self.CameraTrigger_drop.place(x = 150, y= 300)
+        self.CameraTrigger_label.place(x = 10, y= 290)
+        self.CameraTrigger_check.place(x = 150, y= 290)
+        self.CameraTrigger_Apply.place(x = 300, y= 290 )
+        self.CameraTriggerCanvas.place(x = 350, y= 290 )
 
-        self.OptoSplit_label.place(x = 10, y= 340)
-        self.OptoSplit_check.place(x = 150, y= 340)
-        self.OptoSplit_Apply.place(x = 300, y= 340 )
-        self.OptoSplitCanvas.place(x = 350, y= 340 )
+        self.CameraTrigger_selection_label.place(x = 10, y= 330)
+        self.CameraTrigger_drop.place(x = 150, y= 330)
 
-        self.OptosplitFilter_label.place(x = 10, y= 370)
-        self.OptosplitFilter_entry.place(x = 150, y= 370)
+        self.OptoSplit_label.place(x = 10, y= 370)
+        self.OptoSplit_check.place(x = 150, y= 370)
+        self.OptoSplit_Apply.place(x = 300, y= 370 )
+        self.OptoSplitCanvas.place(x = 350, y= 370 )
 
-        self.SaveConfig.place(x = 175, y = 400)
+        self.OptosplitFilter_label.place(x = 10, y= 400)
+        self.OptosplitFilter_entry.place(x = 150, y= 400)
+
+        self.Proj_label.place(x = 10, y = 430)
+        self.Proj_drop.place(x = 175, y = 430)
+        self.SaveConfig.place(x = 310, y = 430)
 
         #Set Initial values for GUI Objects
         self.maxslider.set(4000)
@@ -579,6 +536,7 @@ class deskewApp:
         self.no_steps_label.config(font=('Helvatical bold',12))
         self.exposure_label.config(font=('Helvatical bold',12))
         self.Comp_drop.config(font=('Helvatical bold',10))
+        self.Proj_drop.config(font=('Helvatical bold',10))
         self.config_label.config(font=('Helvatical bold',12))
         self.Config_drop.config(font=('Helvatical bold',8))
         self.Config_Apply.config(font=('Helvatical bold',10))
@@ -598,6 +556,8 @@ class deskewApp:
         self.OptoSplit_label.config(font=('Helvatical bold',12))
         self.OptoSplit_check.config(font=('Helvatical bold',10))
         self.OptoSplit_Apply.config(font=('Helvatical bold',10))
+        self.Proj_label.config(font=('Helvatical bold',12))
+        self.SaveConfig.config(font=('Helvatical bold',12))
 
     def find_daqaolines(self):
         for device in self.local_system.devices:
@@ -620,14 +580,21 @@ class deskewApp:
         else:
             self.DSKW.setDisplayMode(False)
 
+    def projModeSelect(self,value):
+        if value ==  "MIP":
+            self.DSKW.setSingleSlice(False)
+        else:
+            self.DSKW.setSingleSlice(True)
+
     def laserChangeState(self,i):
         laserNos = list(range(4))
         laserNos.remove(i) 
         if not self.laserson[i]:
-            if self.allowMultiLasers.get():
-                self.FilterWheel.move_filter(self.openFilterPos.get())
-            else:
-                self.FilterWheel.move_filter(self.connectedLasers[i].get_filterPos())
+            if self.FilterWheelConnected:
+                if self.allowMultiLasers.get():
+                    self.FilterWheel.move_filter(self.openFilterPos.get())
+                else:
+                    self.FilterWheel.move_filter(self.connectedLasers[i].get_filterPos())
             self.connectedLasers[i].set_power(int(self.laserPWRentrys[i].get()))
             time.sleep(50/1000) #Wait for filter to move Cairn OptoSpin takes ~50ms
             self.laserson[i] = 1
@@ -719,6 +686,15 @@ class deskewApp:
                     self.OptosplitFilter_entry.set(int(info.replace('\n','')))
                     self.OptoSplitApply()
 
+            i += 1 
+            if 'Reconstruction' in lines[i]:
+                if 'MIP' in lines[i]:
+                    self.Proj_clicked.set('MIP')
+                    self.projModeSelect('MIP')
+                else:
+                    self.Proj_clicked.set('Single Slice')
+                    self.projModeSelect('Single Slice')
+
             
 
     def saveConfigFile(self):
@@ -768,10 +744,13 @@ class deskewApp:
                     f.write('OptoSplit: False')
                     f.write('\n')
 
-
-
-                
-
+                if self.Proj_clicked.get():
+                    f.write('Reconstruction Mode: Single Slice')
+                    f.write('\n')
+                    f.write(str(self.OptosplitFilter_entry.get()))
+                else:
+                    f.write('Reconstruction Mode: MIP')
+                    f.write('\n')
 
     def enableGalvo(self):
         if self.scanninggalvo.get():
@@ -872,11 +851,18 @@ class deskewApp:
         [entry.configure(state = DISABLED) for entry in self.laserPWRentrys]
         [switch.configure(state = DISABLED) for switch in self.laserswitches]
 
+        if self.FilterWheelConnected: #Close Filterwheel if connected 
+            self.FilterWheel.exit()
+            self.FilterWheelConnected = False
+
         self.closeAllConnectedLasers()
 
-        for i in range(self.LaserFilter_LB.size()):
-            if i == 0:
-                self.LaserFilterCanvas.itemconfig(self.LaserFilterLED, fill="green")
+        if self.FilterWheelenabled.get():
+            self.FilterWheel = MotrisedFilterWheel()
+            self.FilterWheelConnected = True
+
+        self.LaserFilterCanvas.itemconfig(self.LaserFilterLED, fill="green")
+        for i in range(self.LaserFilter_LB.size()):   
             self.laserlabels[i].configure(text = self.laserNames[i] + ' @')
             
             self.laserswitches[i].configure(state = NORMAL)
@@ -901,7 +887,6 @@ class deskewApp:
                 self.LaserFilter_LB.delete(indx)
                 self.laserNames.pop(int(indx[0]))
                 self.laserPort.pop(int(indx[0]))
-                self.laserNames.pop(int(indx[0]))
                 self.laserfilterPos.pop(int(indx[0]))
                 self.laserTrigMethods.pop(int(indx[0]))
                 self.lasermaxVolts.pop(int(indx[0]))
@@ -929,11 +914,14 @@ class deskewApp:
         self.Sheet_angle_entry['state'] = DISABLED
         self.Pixel_size_entry['state'] = DISABLED
         self.allowMultiLasers_check['state'] = DISABLED
+        if not self.DSKW.getSingleSlice():
+            self.Rotateslider['state'] = NORMAL
         self.DSKW.setScanRange(self.scn_range.get())
         self.DSKW.setDepth(self.nostep.get())
         self.DSKW.setExposure(self.exposure.get())
         self.DSKW.setSheetAngle(self.sheetangle.get())
         self.DSKW.setPixelPitch(self.pixelsize.get())
+
         self.DSKW.GPU_MultiProcess()
         fps_thread = threading.Thread(target= self.plot)
         fps_thread.start()
@@ -949,11 +937,14 @@ class deskewApp:
         self.Pixel_size_entry['state'] = NORMAL
         self.button_live['state'] = NORMAL
         self.allowMultiLasers_check['state'] = NORMAL
+        self.Rotateslider.set(0)
+        self.Rotateslider['state'] = DISABLED
 
     def plot(self):
         start = time.perf_counter_ns()
         if not self.DSKW.getOptoSplit(): #Only one colour at a time
             while True: 
+                
                 if not self.dskwImgq.empty():
                     image_array = self.dskwImgq.get() # empty data from reconstruction pool
                     if isinstance(image_array, str):
@@ -962,15 +953,20 @@ class deskewApp:
                         vmin = self.clr1min
                         vmax = self.clr1max
                         image_array [image_array  < vmin] = 0
+                        image_array [image_array  > vmax] = vmax
                         image_array  = ((image_array/vmax)*255).astype("uint8")
                         # run the update function 
                         img =  ImageTk.PhotoImage(image=Image.fromarray(image_array)) # convert numpy array to tikner object 
+                        
                         
                         self.videofeed.configure(image=img) # update the GUI element
                         self.videofeed.image = img
                         finish = time.perf_counter_ns()
 
                         plottime = (finish-start)/1E6
+                        
+                        
+                            
             
                         fps = 1E3/plottime
                         self.fps_label['text'] = f'FPS: {"{:.1f}".format(fps)}'
@@ -998,6 +994,7 @@ class deskewApp:
 
                         image_array = image_array.astype(np.uint8)
                         # run the update function 
+                        print('here')
                         img =  ImageTk.PhotoImage(image=Image.fromarray(image_array, mode = 'RGB')) # convert numpy array to tikner object 
                         
                         self.videofeed.configure(image=img) # update the GUI element
@@ -1048,6 +1045,5 @@ if __name__ == '__main__':
     root = tk.Tk()
     my_gui = deskewApp(root)
     root.mainloop()
-    my_gui.FilterWheel.exit()
     my_gui.closeAllConnectedLasers()
 
