@@ -1,102 +1,14 @@
-from pycromanager import Bridge
+from pycromanager import Core
 import torch.multiprocessing as multiprocessing
 import numpy as np
 import torch
 import math
-import nidaqmx
-import time
-
-class ScanGalvo:
-    def __init__(self,portName,extTrig=False,extTrigPort=''):
-        self.port = nidaqmx.Task()
-        self.portName = portName
-        self.extTrigPort = extTrigPort #'/ScanLaser/PFI11'
-        self.extTrig = extTrig
-        self.minV = 0
-        self.maxV = 0
-        self.offV = 0 
-        self.v2um = 0
-        self.waveform = []
-        self.pos = 0
-        self.scanrange = 0
-        self.steps = 0
-        self.connected = 0
-
-    def set_minV(self,volts):
-        self.minV = volts
-    
-    def set_maxV(self,volts):
-        self.maxV = volts
-
-    def set_offV(self,volts):
-        self.offV = volts
-
-    def set_v2um(self,volts):
-        self.v2um = volts
-
-    def set_scanrange(self,scanrange):
-        self.scanrange = scanrange
-
-    def set_steps(self,steps):
-        self.steps = steps
-
-    def createWaveform(self):
-        self.pos = 0
-        voltage_range = self.scanrange*self.v2um
-        startV = self.offV - voltage_range/2
-        stopV = self.offV + voltage_range/2
-        ramp = np.linspace(startV,stopV,self.steps)
-        self.waveform = np.concatenate((ramp,np.flip(ramp)))      
-
-    def connect(self):
-        self.port.ao_channels.add_ao_voltage_chan(self.portName,'mychannel',self.minV,self.maxV)
-        if self.extTrig:
-            self.port.timing.cfg_samp_clk_timing(1000,self.extTrigPort,active_edge = nidaqmx.constants.Edge.RISING, sample_mode = nidaqmx.constants.AcquisitionType.CONTINUOUS, samps_per_chan = 50)
-            self.port.out_stream.offset = 0
-            self.port.out_stream.regen_mode = nidaqmx.constants.RegenerationMode.ALLOW_REGENERATION
-        self.connected = 1 
-
-    def preloadGalvo(self):
-        self.port.write(self.waveform)
-        self.port.start()
-
-    def initGalvoPos(self):    
-        #self.port.write(self.waveform[0])
-        self.pos = 0
-
-    def nextPos(self):    
-        self.port.write(self.waveform[self.pos])
-        if self.pos == (self.steps*2)-1:
-             self.pos = 0
-        else:
-             self.pos += 1
-            
-    def exit(self):
-        if self.extTrig:
-            self.port.stop()
-        self.port.close()
-
-class Camera:
-    def __init__(self,portName):
-        self.port = nidaqmx.Task()
-        self.portName = portName
-        self.connected = 0
-
-    def connect(self):
-        self.port.do_channels.add_do_chan(self.portName)
-        self.connected = 1
-
-    def snap(self):
-        self.port.write(True)
-        self.port.write(False)
-
-    def exit(self):
-        self.port.close()
+import utils.sampleScan as sampleScan
+import utils.camera as camera
 
 class livedeskew:
     def __init__(self,stopq,rotateq,dskwImgq,dskwImgq2,dskwImgq3):
-        bridge = Bridge()
-        core = bridge.get_core()
+        core = Core()
         #core.set_roi(0,0,1304,87)
 
         if core.is_sequence_running():
@@ -135,6 +47,9 @@ class livedeskew:
         self.cameraExtTrig = False
         self.optosplit = False
         self.widefieldMode = True
+        self.singleSlice = False # True = only show a single slice crossesction, False = Perform full extended volume projection
+        self.compute_warp = True
+        self.interplationmode = 'bilinear' #linear | bilinear | bicubic | trilinear
 
         #[startx,stopx,starty,stopy]
         self.windowsize = [950,200]#[1700,200]
@@ -144,6 +59,12 @@ class livedeskew:
 
         #self.device = torch.device('cpu')
         self.device = torch.device("cuda:0")
+    
+    def setSingleSlice(self,bool):
+        self.singleSlice = bool
+
+    def getSingleSlice(self):
+        return self.singleSlice
 
     def setDisplayMode(self,bool):
         self.widefieldMode = bool #True = Widefield
@@ -223,11 +144,11 @@ class livedeskew:
         self.new_height = math.ceil(self.height+self.shearFactor*(self.depth-1))
 
     def GPU_MultiProcess(self):
-        bridge = Bridge()
-        core = bridge.get_core()
+        core = Core()
         core.clear_circular_buffer()
         self.height = core.get_image_height()
         self.width = core.get_image_width()
+        self.shearFactor = np.cos(self.sheetangle * np.pi/180) * (self.z_step/self.XY_pixel_pitch)
         self.new_height = math.ceil(self.height+self.shearFactor*(self.depth-1))
         processes = []
 
@@ -266,92 +187,91 @@ class livedeskew:
        
     def snap(self):
         self.camcount = 0
-        with Bridge() as bridge:
-            core = bridge.get_core()
-            core.set_exposure(self.exposuretime)
-            if self.scanGalvo:
-                if self.preloadGalvo:
-                    g = ScanGalvo(self.galvoPort,extTrig=True,extTrigPort= self.galvoTriggerPort)
-                else:
-                    g = ScanGalvo(self.galvoPort)
-                g.set_maxV(self.galvomaxV)
-                g.set_minV(self.galvominV)
-                g.set_offV(self.galvooffV)
-                g.set_v2um(self.galvov2um)
-                g.set_scanrange(self.ScanRange)
-                g.set_steps(self.depth)
-                g.connect()
-                g.createWaveform()
-                if self.cameraExtTrig:
-                    cam = Camera('FilterCam/port1/line0')
-                    cam.connect()
-                    if core.is_sequence_running():
-                        core.stop_sequence_acquisition() # turn camera off
-                    core.start_continuous_sequence_acquisition(0) # start the camera
-                    if self.preloadGalvo:
-                        g.preloadGalvo()
-                        img = self.ExtTrig_grab_frame(core,cam,)
-                        while True:
-                            if self.stopq.value:
-                                break   
-                            img = self.ExtTrig_grab_frame(core,cam,)
-                            self.qcam.put(img)
-                    else:
-                        g.initGalvoPos()
-                        g.nextPos()
-                        while True:
-                            if self.stopq.value:
-                                break   
-                            img = self.ExtTrig_grab_frame(core,cam,)
-                            g.nextPos()
-                            self.qcam.put(img)
-                    self.qcam.put('END')
-                    cam.snap()
-                    core.stop_sequence_acquisition() # stop the camera
-                    cam.exit()
-                else:
-                    if self.preloadGalvo:
-                        g.preloadGalvo()
-                        img = self.grab_frame(core,)
-                        while True:
-                            if self.stopq.value:
-                                    break   
-                            img = self.grab_frame(core,)
-                            self.qcam.put(img)
-                    else:
-                        g.initGalvoPos()
-                        g.nextPos()
-                        while True:
-                            if self.stopq.value:
-                                break   
-                            img = self.grab_frame(core,)
-                            g.nextPos()
-                            self.qcam.put(img)
-                    self.qcam.put('END')
-                g.exit()
+        core = Core()
+        core.set_exposure(self.exposuretime)
+        if self.scanGalvo:
+            if self.preloadGalvo:
+                g = sampleScan.sampleScan(self.galvoPort,extTrig=True,extTrigPort= self.galvoTriggerPort)
             else:
-                if self.cameraExtTrig:
-                    cam = Camera('FilterCam/port1/line0')
-                    cam.connect()
-                    if core.is_sequence_running():
-                        core.stop_sequence_acquisition() # turn camera off
-                    core.start_continuous_sequence_acquisition(0) # start the camera
+                g = sampleScan.sampleScan(self.galvoPort)
+            g.set_maxV(self.galvomaxV)
+            g.set_minV(self.galvominV)
+            g.set_offV(self.galvooffV)
+            g.set_v2um(self.galvov2um)
+            g.set_scanrange(self.ScanRange)
+            g.set_steps(self.depth)
+            g.connect()
+            g.createWaveform()
+            if self.cameraExtTrig:
+                cam = camera.camera('FilterCam/port1/line0')
+                cam.connect()
+                if core.is_sequence_running():
+                    core.stop_sequence_acquisition() # turn camera off
+                core.start_continuous_sequence_acquisition(0) # start the camera
+                if self.preloadGalvo:
+                    g.preloadGalvo()
+                    img = self.ExtTrig_grab_frame(core,cam,)
+                    while True:
+                        if self.stopq.value:
+                            break   
+                        img = self.ExtTrig_grab_frame(core,cam,)
+                        self.qcam.put(img)
+                else:
+                    g.initGalvoPos()
+                    g.nextPos()
                     while True:
                         if self.stopq.value:
                             break   
                         img = self.ExtTrig_grab_frame(core,cam,)
                         g.nextPos()
                         self.qcam.put(img)
-                    self.qcam.put('END')
-                    cam.snap()
-                    core.stop_sequence_acquisition() # stop the camera
-                    cam.exit()
-                else:
+                self.qcam.put('END')
+                cam.snap()
+                core.stop_sequence_acquisition() # stop the camera
+                cam.exit()
+            else:
+                if self.preloadGalvo:
+                    g.preloadGalvo()
+                    img = self.grab_frame(core,)
                     while True:
                         if self.stopq.value:
-                            break                    
-                        self.qcam.put(self.grab_frame(core,))
-                    self.qcam.put('END')   
+                                break   
+                        img = self.grab_frame(core,)
+                        self.qcam.put(img)
+                else:
+                    g.initGalvoPos()
+                    g.nextPos()
+                    while True:
+                        if self.stopq.value:
+                            break   
+                        img = self.grab_frame(core,)
+                        g.nextPos()
+                        self.qcam.put(img)
+                self.qcam.put('END')
+            g.exit()
+        else:
+            if self.cameraExtTrig:
+                cam = camera.camera('FilterCam/port1/line0')
+                cam.connect()
+                if core.is_sequence_running():
+                    core.stop_sequence_acquisition() # turn camera off
+                core.start_continuous_sequence_acquisition(0) # start the camera
+                while True:
+                    if self.stopq.value:
+                        break   
+                    img = self.ExtTrig_grab_frame(core,cam,)
+                    g.nextPos()
+                    self.qcam.put(img)
+                self.qcam.put('END')
+                cam.snap()
+                core.stop_sequence_acquisition() # stop the camera
+                cam.exit()
+            else:
+                while True:
+                    if self.stopq.value:
+                        break                    
+                    self.qcam.put(self.grab_frame(core,))
+                self.qcam.put('END')   
 
     def grab_frame(self,core): 
         core.snap_image()
@@ -384,6 +304,7 @@ class livedeskew:
                     clr3q.put(image_array[self.colour3roi[2]:self.colour3roi[3],self.colour3roi[0]:self.colour3roi[1]])
                     
     def GPU_deskew_max(self,in_imgq,out_imgq):
+        osf = self.shearFactor
         combined_im = torch.zeros([self.height, self.width,2], device=self.device, dtype=self.dtype)
         final_im = torch.zeros([self.new_height, self.width], device=self.device, dtype=self.dtype) 
         if not self.widefieldMode:
@@ -400,6 +321,12 @@ class livedeskew:
                     if not self.optosplit:
                         image_array =  np.squeeze(np.reshape(image_array,(-1, self.height, self.width)))
                     image_array = torch.from_numpy(image_array.astype("float16")).to(self.device)
+
+                    if self.singleSlice:
+                        window_width = 6
+                        image_array[0:int((self.height/2)) - window_width, 0:self.width] = 0
+                        image_array[int((self.height/2) + window_width): self.height, 0:self.width] = 0
+
                     if lefttoright: 
                         startH = math.ceil(self.shearFactor*(i))
                         stopH = math.ceil(self.shearFactor*(i)+self.height)
@@ -419,13 +346,30 @@ class livedeskew:
                     i += 1
                     
                     if not self.widefieldMode:
+                        if self.compute_warp:
+                                shear = osf-self.shearFactor
+                                if not shear == 0:
+                                    pixel_ratio = self.z_step/self.XY_pixel_pitch 
+                                    angle = np.arctan(shear/pixel_ratio)
+                                    scale = np.cos(angle)
+                                    prev_full_im = torch.unsqueeze(torch.unsqueeze(prev_full_im,0),0)
+                                    prev_full_im = torch.nn.functional.interpolate(prev_full_im, mode = self.interplationmode, size=(int(self.new_height*scale),self.width), align_corners=False)
+                                    prev_full_im = torch.squeeze(prev_full_im)
                         disp_array = prev_full_im.cpu().detach().numpy()   
                         out_imgq.put(disp_array.astype("uint16"))  
 
                     if i == self.depth:
                         i = 0  
-
                         if self.widefieldMode:
+                            if self.compute_warp:
+                                shear = osf-self.shearFactor
+                                if not shear == 0:
+                                    pixel_ratio = self.z_step/self.XY_pixel_pitch 
+                                    angle = np.arctan(shear/pixel_ratio)
+                                    scale = np.cos(angle)
+                                    final_im = torch.unsqueeze(torch.unsqueeze(final_im,0),0)
+                                    final_im = torch.nn.functional.interpolate(final_im, mode = self.interplationmode, size=(int(self.new_height*scale),self.width), align_corners=False)
+                                    final_im = torch.squeeze(final_im)
                             disp_array = final_im.cpu().detach().numpy()   
                             out_imgq.put(disp_array.astype("uint16")) 
                         else:
@@ -444,5 +388,4 @@ class livedeskew:
         combined_im[:,:,1] = new_image
         final_im = torch.amax(combined_im, 2)
         return final_im
-
 
