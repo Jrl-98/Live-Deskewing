@@ -43,12 +43,13 @@ class livedeskew:
 
         self.scanGalvo = False
         self.preloadGalvo = False
+        self.altScanHardware = False #True = Hardware other than NIDAQ cards
         self.galvoTriggerPort = ''
         self.cameraExtTrig = False
         self.optosplit = False
         self.widefieldMode = True
         self.singleSlice = False # True = only show a single slice crossesction, False = Perform full extended volume projection
-        self.compute_warp = True
+        self.compute_warp = True #True
         self.interplationmode = 'bilinear' #linear | bilinear | bicubic | trilinear
 
         #[startx,stopx,starty,stopy]
@@ -99,6 +100,12 @@ class livedeskew:
 
     def disableGalvo(self):
         self.scanGalvo = False
+
+    def enableAltHard(self):
+        self.altScanHardware = True
+
+    def disableAltHard(self):
+        self.altScanHardware = False
 
     def enablePreloadGalvo(self):
         self.preloadGalvo = True
@@ -190,14 +197,17 @@ class livedeskew:
         core = Core()
         core.set_exposure(self.exposuretime)
         if self.scanGalvo:
-            if self.preloadGalvo:
-                g = sampleScan.sampleScan(self.galvoPort,extTrig=True,extTrigPort= self.galvoTriggerPort)
+            if not self.altScanHardware:
+                if self.preloadGalvo:
+                    g = sampleScan.sampleScan(self.galvoPort,extTrig=True,extTrigPort= self.galvoTriggerPort)
+                else:
+                    g = sampleScan.sampleScan(self.galvoPort)
+                g.set_maxV(self.galvomaxV)
+                g.set_minV(self.galvominV)
+                g.set_offV(self.galvooffV)
+                g.set_v2um(self.galvov2um)
             else:
-                g = sampleScan.sampleScan(self.galvoPort)
-            g.set_maxV(self.galvomaxV)
-            g.set_minV(self.galvominV)
-            g.set_offV(self.galvooffV)
-            g.set_v2um(self.galvov2um)
+                g = sampleScan.sampleScan()
             g.set_scanrange(self.ScanRange)
             g.set_steps(self.depth)
             g.connect()
@@ -217,7 +227,7 @@ class livedeskew:
                         img = self.ExtTrig_grab_frame(core,cam,)
                         self.qcam.put(img)
                 else:
-                    g.initGalvoPos()
+                    g.initPos()
                     g.nextPos()
                     while True:
                         if self.stopq.value:
@@ -239,7 +249,7 @@ class livedeskew:
                         img = self.grab_frame(core,)
                         self.qcam.put(img)
                 else:
-                    g.initGalvoPos()
+                    g.initPos()
                     g.nextPos()
                     while True:
                         if self.stopq.value:
@@ -347,15 +357,19 @@ class livedeskew:
                     
                     if not self.widefieldMode:
                         if self.compute_warp:
-                                shear = osf-self.shearFactor
-                                if not shear == 0:
-                                    pixel_ratio = self.z_step/self.XY_pixel_pitch 
-                                    angle = np.arctan(shear/pixel_ratio)
-                                    scale = np.cos(angle)
-                                    prev_full_im = torch.unsqueeze(torch.unsqueeze(prev_full_im,0),0)
-                                    prev_full_im = torch.nn.functional.interpolate(prev_full_im, mode = self.interplationmode, size=(int(self.new_height*scale),self.width), align_corners=False)
-                                    prev_full_im = torch.squeeze(prev_full_im)
-                        disp_array = prev_full_im.cpu().detach().numpy()   
+                            shear = osf-self.shearFactor
+                            if not shear == 0:
+                                pixel_ratio = self.z_step/self.XY_pixel_pitch 
+                                angle = np.arctan(shear/pixel_ratio)
+                                scale = np.cos(angle)
+                                warped_prev_full_im = torch.unsqueeze(torch.unsqueeze(prev_full_im,0),0)
+                                warped_prev_full_im = torch.nn.functional.interpolate(warped_prev_full_im, mode = self.interplationmode, size=(int(self.new_height*scale),self.width), align_corners=False)
+                                warped_prev_full_im = torch.squeeze(warped_prev_full_im)
+                                disp_array = warped_prev_full_im.cpu().detach().numpy()   
+                            else:
+                                disp_array = prev_full_im.cpu().detach().numpy() 
+                        else:
+                            disp_array = prev_full_im.cpu().detach().numpy()   
                         out_imgq.put(disp_array.astype("uint16"))  
 
                     if i == self.depth:
@@ -372,11 +386,19 @@ class livedeskew:
                                     final_im = torch.squeeze(final_im)
                             disp_array = final_im.cpu().detach().numpy()   
                             out_imgq.put(disp_array.astype("uint16")) 
-                        else:
-                            prev_full_im = final_im
+                        #else:
+                        #    prev_full_im = final_im
                          
                         self.shearFactor = self.rotateq.value
                         self.new_height = math.ceil(self.height+self.shearFactor*(self.depth-1))
+                        if not self.widefieldMode:
+                            [prev_h,prev_w] = final_im.size()
+                            if prev_h == self.new_height:
+                                prev_full_im = final_im
+                            else:
+                                prev_full_im = torch.zeros([self.new_height, self.width], device=self.device, dtype=self.dtype)   
+                            
+
                         final_im = torch.zeros([self.new_height, self.width], device=self.device, dtype=self.dtype)      
                         if lefttoright:
                             lefttoright = False
