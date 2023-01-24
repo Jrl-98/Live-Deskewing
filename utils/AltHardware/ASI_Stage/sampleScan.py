@@ -58,6 +58,5 @@ class sampleScan:
             ASI_ZCommand = 'TTL x=0' +'\r\n'
             self.ASI_StageSer.write(str.encode(ASI_ZCommand)) 
             self.ASI_StageSer.close()
-            self.port.close()
         except Exception as e:
             print('Exception: Opening serial port: '+ str(e))
