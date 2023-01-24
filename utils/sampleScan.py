@@ -55,7 +55,7 @@ class sampleScan:
         self.port.write(self.waveform)
         self.port.start()
 
-    def initGalvoPos(self):    
+    def initPos(self):    
         #self.port.write(self.waveform[0])
         self.pos = 0
 
