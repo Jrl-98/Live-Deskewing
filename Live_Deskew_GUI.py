@@ -137,7 +137,7 @@ class deskewApp:
         self.master = master
 
         #Initialise the GUI Window
-        self.master.wm_title("OPM Live Deskew v.1.3")
+        self.master.wm_title("OPM Live Deskew v.1.4")
         self.master.configure(bg='#91B9A4')
         self.master.geometry("1200x600")
 
@@ -217,6 +217,7 @@ class deskewApp:
         self.sheetangle = tk.DoubleVar()
         self.pixelsize = tk.DoubleVar()
         self.scanninggalvo = tk.IntVar() 
+        self.altHardware = tk.IntVar() 
         self.preloadgalvo = tk.IntVar()
         self.galvominV = tk.DoubleVar() 
         self.galvomaxV = tk.DoubleVar() 
@@ -315,7 +316,7 @@ class deskewApp:
         self.Config_drop['state'] = 'readonly'
         self.Config_Apply = tk.Button(self.Controltab, text = "Apply", bd = 1, command = self.readConfigFile)
         self.config_label = tk.Label(self.Controltab, text = "Configuration file:", bd = 0)
-        self.ScanningGalvo_label = tk.Label(self.Controltab, text = "Scanning Galvo:", bd = 0)
+        self.ScanningGalvo_label = tk.Label(self.Controltab, text = "Scanning:", bd = 0)
         self.ScanningGalvo_check = tk.Checkbutton(self.Controltab, text = "Enable" , variable=self.scanninggalvo, onvalue=1, offvalue=0, command = self.enableGalvo)
         self.ScanningGalvo_Apply = tk.Button(self.Controltab, text = "Apply", state = DISABLED, bd = 1, command = self.scanningGalvoApply)
         self.galvoCanvas = tk.Canvas(self.Controltab,height = 20, width = 20)
@@ -325,6 +326,7 @@ class deskewApp:
         self.daqaolines_drop['values'] = self.daqaolines
         self.daqaolines_drop['state'] = 'readonly'
         self.daqaolines_label = tk.Label(self.Controltab, text = "Outut Port:", bd = 0)
+        self.altHardware_check = tk.Checkbutton(self.Controltab, text = "Use alt. hardware:" , variable=self.altHardware, onvalue=1, offvalue=0, command = self.enableAltHardware)
         self.PreloadGalvo_check = tk.Checkbutton(self.Controltab, text = "Preload Voltages:" , variable=self.preloadgalvo, onvalue=1, offvalue=0, command = self.enableProload)
         self.daqdilines_drop = ttk.Combobox(self.Controltab, textvariable=self.daqdilines_clicked)
         self.daqdilines_drop['values'] = self.daqdilines
@@ -382,6 +384,7 @@ class deskewApp:
 
         self.daqaolines_drop['state'] = DISABLED
         self.PreloadGalvo_check['state'] = DISABLED
+        self.altHardware_check['state'] = DISABLED
         self.daqdilines_drop['state'] = DISABLED
         self.galvominV_entry['state'] = DISABLED
         self.galvomaxV_entry['state'] = DISABLED
@@ -466,6 +469,7 @@ class deskewApp:
 
         self.daqaolines_label.place(x = 5, y= 70)
         self.daqaolines_drop.place(x = 80, y= 70)
+        self.altHardware_check.place(x = 300, y= 70)
 
         self.PreloadGalvo_check.place(x = 5, y = 100)
         self.daqdilines_label.place(x = 130, y= 100)
@@ -632,21 +636,25 @@ class deskewApp:
                 lines = f.readlines()
         
             i = 0
-            if 'Galvo' in lines[i]:
+            if 'Scanning' in lines[i]:
                 if 'True' in lines[i]:
                     i =+ 1
                     self.scanninggalvo.set(1)
                     self.enableGalvo()
-                    info = lines[i].split(':') #OutPort:TrigBool:TrigPort:MinV:MaxV:OffV:V2um
-                    self.daqaolines_clicked.set(info[0])
-                    if 'True' in info[1]:
-                        self.preloadgalvo.set(1)
-                        self.enableProload()
-                        self.daqdilines_clicked.set(info[2])
-                    self.galvominV.set(float(info[3]))
-                    self.galvomaxV.set(float(info[4]))
-                    self.galvooffV.set(float(info[5]))
-                    self.galvov2um.set(float(info[6].replace('\n','')))
+                    if 'Alt. Hardware' in lines[i]:
+                        self.altHardware.set(1)
+                        self.enableAltHardware()
+                    else:
+                        info = lines[i].split(':') #OutPort:TrigBool:TrigPort:MinV:MaxV:OffV:V2um
+                        self.daqaolines_clicked.set(info[0])
+                        if 'True' in info[1]:
+                            self.preloadgalvo.set(1)
+                            self.enableProload()
+                            self.daqdilines_clicked.set(info[2])
+                        self.galvominV.set(float(info[3]))
+                        self.galvomaxV.set(float(info[4]))
+                        self.galvooffV.set(float(info[5]))
+                        self.galvov2um.set(float(info[6].replace('\n','')))
                     self.scanningGalvoApply()
             i += 1          
             if 'Laser' in lines[i]:
@@ -702,16 +710,20 @@ class deskewApp:
         if not USER_INP == None:
             with open(os.path.join(os.getcwd(),USER_INP+'.txt'), 'w') as f:
                 if self.scanninggalvo.get():
-                    f.write('Galvo: True')
+                    f.write('Scanning: True')
                     f.write('\n')
-                    if self.preloadgalvo.get():
-                        stringTowrite = self.daqaolines_clicked.get() + ':' + 'True' + ':' + self.daqdilines_clicked.get() + ':' + str(self.galvominV.get()) + ':' + str(self.galvomaxV.get()) + ':' + str(self.galvooffV.get()) + ':' + str(self.galvov2um.get())
+                    if self.altHardware.get():
+                        f.write('Alt. Hardware')
+                        f.write('\n')
                     else:
-                        stringTowrite = self.daqaolines_clicked.get() + ':' + 'False' + ':' + 'None' + ':' + str(self.galvominV.get()) + ':' + str(self.galvomaxV.get()) + ':' + str(self.galvooffV.get()) + ':' + str(self.galvov2um.get())
-                    f.write(stringTowrite)
-                    f.write('\n')
+                        if self.preloadgalvo.get():
+                            stringTowrite = self.daqaolines_clicked.get() + ':' + 'True' + ':' + self.daqdilines_clicked.get() + ':' + str(self.galvominV.get()) + ':' + str(self.galvomaxV.get()) + ':' + str(self.galvooffV.get()) + ':' + str(self.galvov2um.get())
+                        else:
+                            stringTowrite = self.daqaolines_clicked.get() + ':' + 'False' + ':' + 'None' + ':' + str(self.galvominV.get()) + ':' + str(self.galvomaxV.get()) + ':' + str(self.galvooffV.get()) + ':' + str(self.galvov2um.get())
+                        f.write(stringTowrite)
+                        f.write('\n')
                 else:
-                    f.write('Galvo: False')
+                    f.write('Scanning: False')
                     f.write('\n')
                     
                 if self.LaserFilter.get():
@@ -744,18 +756,18 @@ class deskewApp:
                     f.write('OptoSplit: False')
                     f.write('\n')
 
-                if self.Proj_clicked.get():
-                    f.write('Reconstruction Mode: Single Slice')
-                    f.write('\n')
-                    f.write(str(self.OptosplitFilter_entry.get()))
-                else:
+                if 'MIP' in self.Proj_clicked.get():
                     f.write('Reconstruction Mode: MIP')
+                    f.write('\n')                   
+                else:
+                    f.write('Reconstruction Mode: Single Slice')
                     f.write('\n')
 
     def enableGalvo(self):
         if self.scanninggalvo.get():
             self.daqaolines_drop['state'] = NORMAL
             self.PreloadGalvo_check['state'] = NORMAL
+            self.altHardware_check['state'] = NORMAL
             self.galvominV_entry['state'] = NORMAL
             self.galvomaxV_entry['state'] = NORMAL
             self.galvooffV_entry['state'] = NORMAL
@@ -765,6 +777,7 @@ class deskewApp:
         else:
             self.daqaolines_drop['state'] = DISABLED
             self.PreloadGalvo_check['state'] = DISABLED
+            self.altHardware_check['state'] = DISABLED
             self.daqdilines_drop['state'] = DISABLED
             self.galvominV_entry['state'] = DISABLED
             self.galvomaxV_entry['state'] = DISABLED
@@ -772,6 +785,27 @@ class deskewApp:
             self.galvov2um_entry['state'] = DISABLED
             self.ScanningGalvo_Apply['state'] = DISABLED
             self.galvoCanvas.itemconfig(self.ScanningGalvoLED, fill="red")
+            self.DSKW.disableGalvo()
+            self.DSKW.disableAltHard()
+
+    def enableAltHardware(self):
+        if self.altHardware.get():
+            self.daqaolines_drop['state'] = DISABLED
+            self.PreloadGalvo_check['state'] = DISABLED
+            self.daqdilines_drop['state'] = DISABLED
+            self.galvominV_entry['state'] = DISABLED
+            self.galvomaxV_entry['state'] = DISABLED
+            self.galvooffV_entry['state'] = DISABLED
+            self.galvov2um_entry['state'] = DISABLED
+            self.galvoCanvas.itemconfig(self.ScanningGalvoLED, fill="orange")
+        else:
+            self.daqaolines_drop['state'] = NORMAL
+            self.PreloadGalvo_check['state'] = NORMAL
+            self.galvominV_entry['state'] = NORMAL
+            self.galvomaxV_entry['state'] = NORMAL
+            self.galvooffV_entry['state'] = NORMAL
+            self.galvov2um_entry['state'] = NORMAL
+            self.galvoCanvas.itemconfig(self.ScanningGalvoLED, fill="orange")
             self.DSKW.disableGalvo()
     
     def enableProload(self):
@@ -828,22 +862,27 @@ class deskewApp:
         self.connectedLasers = []
 
     def scanningGalvoApply(self):
-        port = self.daqaolines_clicked.get()
-        max = self.galvomaxV.get()
-        min = self.galvominV.get()      
-        off = self.galvooffV.get()
-        v2um = self.galvov2um.get()
+        if not self.altHardware.get():
+            port = self.daqaolines_clicked.get()
+            max = self.galvomaxV.get()
+            min = self.galvominV.get()      
+            off = self.galvooffV.get()
+            v2um = self.galvov2um.get()
 
-        self.DSKW.set_galvoParams(port,max,min,off,v2um)
-        
-        self.DSKW.enableGalvo()
+            self.DSKW.set_galvoParams(port,max,min,off,v2um)
+            
+            
 
-        if self.preloadgalvo.get():
-            self.DSKW.enablePreloadGalvo()
-            self.DSKW.setGalvoTriggerPort(self.daqdilines_clicked.get())
+            if self.preloadgalvo.get():
+                self.DSKW.enablePreloadGalvo()
+                self.DSKW.setGalvoTriggerPort(self.daqdilines_clicked.get())
+            else:
+                self.DSKW.disablePrelodGalvo()
         else:
-            self.DSKW.disablePrelodGalvo()
+            print('Using alternative hardware')
+            self.DSKW.enableAltHard()
 
+        self.DSKW.enableGalvo()
         self.galvoCanvas.itemconfig(self.ScanningGalvoLED, fill="green")
 
     def laserFilter_Apply(self):
