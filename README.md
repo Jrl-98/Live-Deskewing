@@ -8,14 +8,15 @@ This is a software package to display deskewed images in real time for lightshee
 Please see the software user manual to help with getting started with the software. However, if you have an issues using the code that has not been addressed please feel free to email me at jrl70@cam.ac.uk. 
 
 ## Using Live Deskewing GUI
-Before running the code for the first time the file path for the images on lines 285-291 will need to be update to where you have them saved on your PC. All the required images can be found in the GUI_Images folder.
+Before running the code for the first time the file path for the images on lines 235-241 will need to be updated to where you have them saved on your PC. All the required images can be found in the GUI_Images folder.
 
-1) Open the camera in micromanager and select the ROI where the sheet is formed. NB: Smaller ROIs will have a higher final framerate
-2) Run the script *Live_Deskew_GUI.py*
-3) Press the *Start* button to begin displaying a live deskewed output.
+1) Download the code from GitHub
+2) Open the camera in micromanager and select the ROI where the sheet is formed. NB: Smaller ROIs will have a higher final framerate
+3) Run the script *Live_Deskew_GUI.py*
+4) Press the *Start* button to begin displaying a live deskewed output.
 
 ## Things to note
-- Both [pycro-manager](https://github.com/micro-manager/pycro-manager) and [nidaqmx](https://github.com/ni/nidaqmx-python) will need to be installed for the GUI to run
+- Both [pycro-manager](https://github.com/micro-manager/pycro-manager) and [nidaqmx](https://github.com/ni/nidaqmx-python) will need to be installed for the GUI to run. However, in section 2.2.3 of the Software user manual we detail how to make a few simple edits to the code so that nidaqmx is not needed. 
 - Once opened, by default the software will only control the camera. To add other hardware to the GUI navigate to the *Control Settings* tab. Hardware configurations can either be manually set or loaded from a configuration file. 
 - Before adding any hardware control into the GUI I would recommend starting the deskewing to check everything is correctly installed and working.  
 - The sheet angle (angle subtended between the excitation sheet and the scan axis) and the image pixel size (size of camera pixel in the sample) must be set under *Deskewing Parameters* on the *Live Settings* tab. 
@@ -25,6 +26,7 @@ Before running the code for the first time the file path for the images on lines
 - The software can handle up to 4 lasers. Though this number can be arbitrarily increased by adding more buttons on the *Live Settings* tab. 
 - Lasers can be controlled by either analogue voltage or a digital TTL signal. Currently only National Instruments DAQ cards are supported within the GUI. However, support for other hardware should be easy to incorperate. 
 - Unless the *Allow Multiple Lasers* box is checked, turning a laser on will cause all other lasers to turn off and the filterwheel position to change. 
+- See section 2.2.2 of the software user manual to see detailed instructions on how to use other scanning hardware with the software. 
 
 ## Examples
 
