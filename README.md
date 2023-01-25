@@ -5,7 +5,7 @@
 # Live-Deskewing
 This is a software package to display deskewed images in real time for lightsheet microscopes. It's aim is to make the live display from lighsheet microscopes easier to interpret. This will help in sample navigation and locating areas of interest within the sample. The software uses [pycro-manager](https://github.com/micro-manager/pycro-manager) to handle camera acquistion allowing so that it is compatiable with most modern scientific cameras. See our preprint paper on this software at https://arxiv.org/abs/2211.00645.
 
-Please see the software user manual to help with getting started with the software. However, if you have an issues using the code that has not been addressed please feel free to email me at jrl70@cam.ac.uk. 
+Please see the software user manual to help with getting started with the software. However, if you have any issues using the code that has not been addressed please feel free to email me at jrl70@cam.ac.uk. 
 
 ## Using Live Deskewing GUI
 Before running the code for the first time the file path for the images on lines 235-241 will need to be updated to where you have them saved on your PC. All the required images can be found in the GUI_Images folder.
